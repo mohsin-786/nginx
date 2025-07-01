@@ -1,93 +1,306 @@
-# nginx
+# flux2-hub-spoke-example
 
+[![test](https://github.com/fluxcd/flux2-hub-spoke-example/workflows/test/badge.svg)](https://github.com/fluxcd/flux2-hub-spoke-example/actions)
+[![e2e](https://github.com/fluxcd/flux2-hub-spoke-example/workflows/e2e/badge.svg)](https://github.com/fluxcd/flux2-hub-spoke-example/actions)
+[![license](https://img.shields.io/github/license/fluxcd/flux2-hub-spoke-example.svg)](https://github.com/fluxcd/flux2-hub-spoke-example/blob/main/LICENSE)
 
+This repository showcases how to run Flux on a central Kubernetes cluster
+and have it manage the GitOps continuous delivery of apps and infrastructure
+workloads on multiple clusters.
 
-## Getting started
+![Flux Hub and Spoke](.github/imgs/flux-hub-spoke-diagram.png)
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Prerequisites
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+For this example, you need to install the following tools:
 
-## Add your files
+- [Flux CLI](https://fluxcd.io/flux/installation/#install-the-flux-cli)
+- [Kubernetes KinD](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
+- kubectl and kustomize
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+On macOS and Linux, you can install the tools using the following commands:
 
+```bash
+brew install fluxcd/tap/flux
+brew install kind kubectl kustomize
 ```
-cd existing_repo
-git remote add origin https://gitlab.research.corteva.com/mohsin.abdeen/nginx.git
-git branch -M main
-git push -uf origin main
+
+In order to follow the guide you'll need a GitHub account and a
+[personal access token](https://help.github.com/en/github/authenticating-to-github/creating-a-personal-access-token-for-the-command-line)
+that can create repositories (check all permissions under `repo`).
+
+## Repository structure
+
+The Git repository contains the following top directories:
+
+- `deploy` dir contains the HelmRelease definitions for the apps and infrastructure workloads
+- `clusters` dir contains the apps and infrastructure Kustomize overlays for each target cluster
+- `hub` dir contains the Flux configuration for the central cluster and targets
+
+```shell
+├── deploy
+│   ├── apps
+│   │   ├── podinfo.yaml
+│   │   └── kustomization.yaml
+│   ├── infra-configs
+│   │   ├── cluster-issuers.yaml
+│   │   └── kustomization.yaml
+│   ├── infra-controllers
+│   │   ├── cert-manager.yaml
+│   │   ├── ingress-nginx.yaml
+│   │   └── kustomization.yaml
+│   └── tenants
+├── clusters
+│   ├── production
+│   └── staging
+│       ├── apps
+│       │   ├── kustomization.yaml
+│       │   └── podinfo-values.yaml
+│       ├── infra-configs
+│       ├── infra-controllers
+│       └── tenants
+└── hub
+    ├── flux-system
+    ├── production.yaml
+    └── staging.yaml
 ```
 
-## Integrate with your tools
+## Bootstrap the cluster fleet
 
-- [ ] [Set up project integrations](https://gitlab.research.corteva.com/mohsin.abdeen/nginx/-/settings/integrations)
+To bootstrap the cluster fleet, first you need to create several Kubernetes KinD
+clusters by running the following command:
 
-## Collaborate with your team
+```shell
+make fleet-up
+```
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+The above command will create the following clusters:
 
-## Test and Deploy
+- `flux-hub` - the central cluster where Flux will run
+- `flux-staging` - the target cluster where Flux will deploy the `clusters/staging` workloads
+- `flux-production` - the target cluster where Flux will deploy the `clusters/production` workloads
 
-Use the built-in continuous integration in GitLab.
+After the clusters are created, kubeconfig files for staging and production are generated and persisted
+in the `flux-hub` cluster, so that Flux can access the target clusters.
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+```console
+$ kubectl get secrets -A
+NAMESPACE     NAME                     TYPE
+production    cluster-kubeconfig       Opaque
+staging       cluster-kubeconfig       Opaque
+```
 
-***
+Fork this repository on your personal GitHub account and
+export your GitHub access token, username and repo name:
 
-# Editing this README
+```shell
+export GITHUB_TOKEN=<your-token>
+export GITHUB_USER=<your-username>
+export GITHUB_REPO=<repository-name>
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+Then, bootstrap Flux on the hub cluster:
 
-## Suggestions for a good README
+```shell
+flux bootstrap github \
+    --context=kind-flux-hub \
+    --owner=${GITHUB_USER} \
+    --repository=${GITHUB_REPO} \
+    --branch=main \
+    --personal \
+    --path=hub
+```
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+The bootstrap command commits the manifests for the Flux components in `hub/flux-system` dir
+and creates a deploy key with read-only access on GitHub, so it can pull changes inside the cluster.
 
-## Name
-Choose a self-explaining name for your project.
+Wait for the Flux to reconcile the infrastructure and apps workloads on the target clusters with:
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+```shell
+watch flux get kustomizations -A
+```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+Once the Flux Kustomizations are ready, you can list the Helm releases deployed in the target clusters.
+For example, in the staging cluster:
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+```console
+$ helm --kube-context kind-flux-staging ls -A
+NAME            NAMESPACE       STATUS     CHART
+cert-manager    cert-manager    deployed   cert-manager-v1.14.4
+ingress-nginx   ingress-nginx   deployed   ingress-nginx-4.10.0 
+podinfo         podinfo         deployed   podinfo-6.6.2  
+```
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+For each target cluster, there is a corresponding namespace in the hub cluster that contains the
+Flux HelmRelease objects for the apps and infrastructure workloads.
+For example, in the staging namespace:
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```console
+$ flux --context kind-flux-hub -n staging get hr
+NAME            REVISION        SUSPENDED       READY                                                                                           
+cert-manager    v1.14.4         False           True        
+ingress-nginx   4.10.0          False           True      
+podinfo         6.6.2           False           True
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+> [!TIP]
+> Note that Flux detects changes made directly in-cluster on the objects managed
+> by a HelmRelease and automatically [corrects the drift](https://fluxcd.io/flux/components/helm/helmreleases/#drift-detection).
+> During an incident or for debugging purposes, you can manually suspend the reconciliation
+> of a HelmRelease with `flux suspend hr <name> -n <namespace>`.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+## Customize the workloads
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+Assuming you want to ship workloads to the production cluster with a different configuration,
+you can employ Kustomize patches in the `clusters/production` overlay and change the Flux HelmRelease values.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+For example, to change the number of replicas for `ingress-nginx` in the production cluster,
+you can create a patch file in `clusters/production/infra-controllers/ingress-nginx-values.yaml`:
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```yaml
+apiVersion: helm.toolkit.fluxcd.io/v2beta2
+kind: HelmRelease
+metadata:
+  name: ingress-nginx
+spec:
+  chart:
+    spec:
+      version: ">=4.10.0"
+  values:
+    controller:
+      replicaCount: 2
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+And then apply the patch to the `ingress-nginx` HelmRelease in the
+`clusters/production/infra-controllers/kustomization.yaml` file with:
 
-## License
-For open source projects, say how it is licensed.
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../deploy/infra-controllers
+patches:
+  - target:
+      kind: HelmRelease
+      name: ingress-nginx
+    path: ingress-nginx-values.yaml
+```
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Verify that the patch is correctly applied with:
+
+```shell
+kustomize build ./clusters/production/infra-controllers/
+```
+
+After you commit the changes to the repository, Flux will automatically apply the changes.
+
+You can trigger a manual reconciliation with:
+
+```shell
+flux -n production reconcile ks infra-controllers --with-source
+```
+
+To verify the number of pods, you can list the deployments in the production cluster:
+
+```console
+kubectl --context kind-flux-production -n ingress-nginx get deploy
+NAME                       READY   UP-TO-DATE
+ingress-nginx-controller   2/2     2
+```
+
+> [!IMPORTANT]
+> Note that on production clusters, it is recommended to pin the Helm chart to an exact
+> version and to use a promotion workflow to test new versions on the staging cluster before
+> deploying to production. For more information, see the guide
+> [Promote Flux Helm Releases with GitHub Actions](https://fluxcd.io/flux/use-cases/gh-actions-helm-promotion/).
+
+## Security considerations and dependency management
+
+In the `deploy/tenants` dir we provision the tenant namespaces and RBAC resources. There are two types of tenants:
+
+- cluster admins - have full access to the cluster resources and can deploy HelmReleases that contain CRD controllers
+- app operators - have restricted access to the app namespaces and can't manage cluster-wide resources like CRDs
+
+At bootstrap, Flux provisions the tenant namespaces and RBAC resources in the target clusters.
+The `deploy/apps` HelmReleases are deployed using the `flux-restricted` service account while the
+`deploy/infra-controllers` HelmReleases and the `deploy/infra-configs` custom resources
+are deployed using the `flux-cluster-admin` service account.
+
+To enforce the RBAC restrictions, and to provision the controllers before the custom resources, we use the
+`dependsOn` feature in the `hub/staging.yaml` and `hub/production.yaml` to order the reconciliation like so:
+
+1. `tenants` (namespaces, service accounts and role bindings resources)
+2. `infra-controllers` (CRD controllers - depends on `tenants`)
+3. `infra-configs` (cluster-wide custom resources - depends on `infra-controllers`)
+4. `apps` (app workloads - depends on `infra-configs`)
+
+> [!TIP]
+> When managing a large number of tenants and clusters, it is recommended to use run a dedicated
+> Flux instance for each group of clusters belonging to the same tenant. For more information
+> on how to assign Flux instances to specific clusters, see the
+> [Flux sharding and horizontal scaling guide](https://fluxcd.io/flux/installation/configuration/sharding/).
+
+## Cluster connectivity and access control
+
+For the Flux kustomize-controller and helm-controller to be able to
+reconcile the remote clusters, the Kubernetes API servers
+need to be accessible from the central cluster.
+
+The Flux controllers authenticate with the target clusters using
+kubeconfig files stored as Kubernetes secrets in the central cluster.
+
+Both the Flux `Kustomization` and `HelmRelease` objects take a reference to the
+Kubernetes secret containing the kubeconfig file:
+
+```yaml
+kind: Kustomization | HelmRelease
+spec:
+  kubeConfig:
+    secretRef:
+      name: cluster-kubeconfig
+```
+
+The secret defined in the `secretRef` must exist in the same namespace as the `Kustomization`
+or `HelmRelease` object, and the kubeconfig file must be stored in the `value` data key.
+
+If the target clusters are accessible over a proxy, the proxy address must be set in the kubeconfig file.
+If the target API servers use self-signed certificates, both controllers can be configured
+to skip the TLS verification by setting the `--insecure-kubeconfig-tls` flag in the controller container args.
+
+> [!IMPORTANT]
+> Note that kubeconfigs that rely on exec-based authentication plugins are not supported by default.
+> You will need to build custom container images with the necessary binaries and configure
+> the controllers with the `--insecure-kubeconfig-exec` flag. Another option is to generate kubeconfigs
+> with bearer tokens and refresh them periodically with a CronJob that runs e.g. `aws eks get-token`.
+
+## Monitoring and alerting
+
+To configure Prometheus, Loki and Grafana for monitoring the Flux controllers and the workloads reconciliation,
+see the [monitoring example repository](https://github.com/fluxcd/flux2-monitoring-example).
+
+To configure Flux to send events for Slack, Teams, Discord, Sentry and others external system,
+you can follow the [alerting guide](https://fluxcd.io/flux/monitoring/alerts/).
+
+## Testing
+
+After making changes to the manifests, you can validate them locally with [kubeconform](https://github.com/yannh/kubeconform) by running:
+
+```shell
+make validate
+```
+
+Any change to the Kubernetes manifests or to the repository structure should be validated in CI before
+a pull requests is merged into the main branch and synced on the cluster.
+
+This repository contains the following GitHub CI workflows:
+
+* the [test workflow](./.github/workflows/test.yaml) validates the Kubernetes manifests and Kustomize overlays are conformant with the Flux OpenAPI spec 
+* the [e2e workflow](./.github/workflows/e2e.yaml) starts the Kubernetes cluster fleet in CI and tests the setup by running Flux in Kubernetes Kind
+
+## Teardown
+
+To delete the cluster fleet, run the following command:
+
+```shell
+make fleet-down
+```
