@@ -2,7 +2,6 @@ apiVersion: source.toolkit.fluxcd.io/v1beta2
 kind: HelmRepository
 metadata:
   name: argocd
-  namespace: flux-system
 spec:
   interval: 2m
   url: https://argoproj.github.io/argo-helm
@@ -23,7 +22,6 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: argocd
-        namespace: flux-system
       reconcileStrategy: Revision
       interval: 2m
   targetNamespace: argocd
