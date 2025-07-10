@@ -33,7 +33,7 @@ metadata:
   namespace: staging
 spec:
   dependsOn:
-    - name: flux-rbac
+  - name: flux-rbac
   targetNamespace: staging
   interval: 1h
   retryInterval: 3m
@@ -45,15 +45,15 @@ spec:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  patches:
-    - target:
-        kind: HelmRelease
-      patch: |
-        - op: add
-          path: /spec/kubeConfig
-          value:
-            secretRef:
-              name: cluster-kubeconfig
-        - op: add
-          path: /spec/serviceAccountName
-          value: flux-cluster-admin
+#  patches:
+#     - target:
+#         kind: HelmRelease
+#       patch: |
+#         - op: add
+#           path: /spec/kubeConfig
+#           value:
+#             secretRef:
+#               name: cluster-kubeconfig
+#         - op: add
+#           path: /spec/serviceAccountName
+#           value: flux-cluster-admin

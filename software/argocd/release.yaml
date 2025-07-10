@@ -24,6 +24,10 @@ spec:
         name: argocd
       reconcileStrategy: Revision
       interval: 2m
+  kubeConfig:
+    secretRef:
+      name: cluster-kubeconfig
+  serviceAccountName: flux-cluster-admin
   targetNamespace: argocd
   install:
     createNamespace: true
