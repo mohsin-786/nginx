@@ -1,0 +1,43 @@
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: argo-workflows
+spec:
+  interval: 2m
+  url: https://argoproj.github.io/argo-helm
+  # certSecretRef:
+  #   name: tls
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: argo-workflows
+spec:
+  interval: 2m
+  timeout: 5m
+  chart:
+    spec:
+      chart: argo-workflows
+      version: '0.45.18'
+      sourceRef:
+        kind: HelmRepository
+        name: argo-workflows
+      reconcileStrategy: Revision
+      interval: 2m
+  kubeConfig:
+    secretRef:
+      name: cluster-kubeconfig
+  serviceAccountName: flux-cluster-admin
+  targetNamespace: argo-workflows
+  install:
+    createNamespace: true
+    timeout: 2m
+    remediation:
+      retries: 3
+  upgrade:
+    timeout: 2m
+    remediation:
+      remediateLastFailure: True
+  values:
+    crds:
+      keep: false

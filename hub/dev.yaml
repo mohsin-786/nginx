@@ -1,0 +1,96 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: argocd-ns
+  namespace: dev
+spec:
+  interval: 1h
+  retryInterval: 3m
+  timeout: 5m
+  prune: true
+  wait: true
+  path: ./clusters/dev/software/argocd/namespace
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  kubeConfig:
+    secretRef:
+      name: cluster-kubeconfig
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: argocd
+  namespace: dev
+spec:
+  dependsOn:
+  - name: argocd-ns
+  targetNamespace: dev
+  retryInterval: 3m
+  timeout: 5m
+  prune: true
+  wait: true
+  path: ./clusters/dev/software/argocd #ingress-nginx.yaml
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  kubeConfig:
+    secretRef:
+      name: cluster-kubeconfig
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: argo-workflows-ns
+  namespace: dev
+spec:
+  interval: 1h
+  retryInterval: 3m
+  timeout: 5m
+  prune: true
+  wait: true
+  path: ./clusters/dev/software/argo-workflows/namespace
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  kubeConfig:
+    secretRef:
+      name: cluster-kubeconfig
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: argo-workflows
+  namespace: dev
+spec:
+  dependsOn:
+  - name: argo-workflows-ns
+  targetNamespace: dev
+  retryInterval: 3m
+  timeout: 5m
+  prune: true
+  wait: true
+  path: ./clusters/dev/software/argo-workflows #ingress-nginx.yaml
+  kubeConfig:
+    secretRef:
+      name: cluster-kubeconfig
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+
+#  patches:
+#     - target:
+#         kind: HelmRelease
+#       patch: |
+#         - op: add
+#           path: /spec/kubeConfig
+#           value:
+#             secretRef:
+#               name: cluster-kubeconfig
+#         - op: add
+#           path: /spec/serviceAccountName
+#           value: flux-cluster-admin

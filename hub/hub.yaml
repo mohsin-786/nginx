@@ -1,0 +1,35 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: argocd-ns
+  namespace: flux-system
+spec:
+  interval: 1h
+  retryInterval: 3m
+  timeout: 5m
+  prune: true
+  wait: true
+  path: ./clusters/hub/software/argocd/namespace
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: argocd
+  namespace: flux-system
+spec:
+  dependsOn:
+  - name: argocd-ns
+  targetNamespace: argocd
+  retryInterval: 3m
+  timeout: 5m
+  prune: true
+  wait: true
+  path: ./clusters/hub/software/argocd
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
