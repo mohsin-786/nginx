@@ -71,9 +71,6 @@ spec:
         value:
           secretRef:
             name: cluster-kubeconfig
-      - op: add
-        path: /spec/serviceAccountName
-        value: flux-cluster-admin
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -125,9 +122,6 @@ spec:
         value:
           secretRef:
             name: cluster-kubeconfig
-      - op: add
-        path: /spec/serviceAccountName
-        value: flux-cluster-admin
 
 #  patches:
 #     - target:
