@@ -4,7 +4,7 @@ metadata:
   name: argocd-ns
   namespace: flux-system
 spec:
-  interval: 1h
+  interval: 1m
   retryInterval: 3m
   timeout: 5m
   prune: true
@@ -24,6 +24,7 @@ spec:
   dependsOn:
   - name: argocd-ns
   targetNamespace: argocd
+  interval: 1m
   retryInterval: 3m
   timeout: 5m
   prune: true

@@ -4,7 +4,7 @@ metadata:
   name: argocd-ns
   namespace: dev
 spec:
-  interval: 1h
+  interval: 1m
   retryInterval: 3m
   timeout: 5m
   prune: true
@@ -27,6 +27,7 @@ spec:
   dependsOn:
   - name: argocd-ns
   targetNamespace: dev
+  interval: 1m
   retryInterval: 3m
   timeout: 5m
   prune: true
@@ -46,7 +47,7 @@ metadata:
   name: argo-workflows-ns
   namespace: dev
 spec:
-  interval: 1h
+  interval: 1m
   retryInterval: 3m
   timeout: 5m
   prune: true
@@ -70,6 +71,7 @@ spec:
   - name: argo-workflows-ns
   targetNamespace: dev
   retryInterval: 3m
+  interval: 1m
   timeout: 5m
   prune: true
   wait: true
